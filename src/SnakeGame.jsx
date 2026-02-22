@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, memo } from "react";
 
 const GRID_SIZE = 20;
 const CELL_SIZE = 22;
@@ -37,6 +37,34 @@ const POINTS = {
   "🧁": 20, "🍰": 20,
   "🍮": 25, "🎂": 30,
 };
+
+const BOARD_PX = GRID_SIZE * CELL_SIZE;
+
+// Static checkerboard grid - never re-renders
+const Grid = memo(function Grid() {
+  return (
+    <>
+      {Array.from({ length: GRID_SIZE }, (_, row) =>
+        Array.from({ length: GRID_SIZE }, (_, col) => (
+          <div
+            key={`${row}-${col}`}
+            style={{
+              position: "absolute",
+              left: col * CELL_SIZE,
+              top: row * CELL_SIZE,
+              width: CELL_SIZE,
+              height: CELL_SIZE,
+              background:
+                (row + col) % 2 === 0
+                  ? "rgba(255,182,206,0.08)"
+                  : "rgba(212,180,247,0.06)",
+            }}
+          />
+        ))
+      )}
+    </>
+  );
+});
 
 function isOccupied(pos, snake, foods) {
   if (snake.some((s) => s.x === pos.x && s.y === pos.y)) return true;
@@ -79,6 +107,7 @@ export default function SnakeGame() {
   const [highScore, setHighScore] = useState(0);
   const [particles, setParticles] = useState([]);
   const [combo, setCombo] = useState(null);
+  const [, setFrame] = useState(0);
 
   const dirRef = useRef(direction);
   const snakeRef = useRef(snake);
@@ -86,6 +115,8 @@ export default function SnakeGame() {
   const scoreRef = useRef(score);
   const gameStateRef = useRef(gameState);
   const queuedDir = useRef(null);
+  const prevSnakeRef = useRef([{ x: 10, y: 10 }]);
+  const interpRef = useRef(0);
 
   dirRef.current = direction;
   snakeRef.current = snake;
@@ -114,6 +145,8 @@ export default function SnakeGame() {
   const startGame = useCallback(() => {
     const initial = [{ x: 10, y: 10 }];
     setSnake(initial);
+    prevSnakeRef.current = initial;
+    interpRef.current = 0;
     setDirection({ x: 1, y: 0 });
     dirRef.current = { x: 1, y: 0 };
     queuedDir.current = null;
@@ -133,6 +166,8 @@ export default function SnakeGame() {
     }
 
     const currentSnake = snakeRef.current;
+    prevSnakeRef.current = currentSnake;
+
     const head = currentSnake[0];
     const newHead = {
       x: (head.x + dir.x + GRID_SIZE) % GRID_SIZE,
@@ -178,11 +213,26 @@ export default function SnakeGame() {
     }
   }, [spawnParticles, showCombo]);
 
+  // rAF game loop: ticks at game speed, renders at 60fps with interpolation
   useEffect(() => {
     if (gameState !== "playing") return;
     const speed = Math.max(MIN_SPEED, INITIAL_SPEED - Math.floor(score / 30) * SPEED_INCREMENT);
-    const interval = setInterval(tick, speed);
-    return () => clearInterval(interval);
+    let lastTick = performance.now();
+    let rafId;
+
+    const loop = (now) => {
+      rafId = requestAnimationFrame(loop);
+      if (now - lastTick >= speed) {
+        lastTick += speed;
+        // Prevent spiral if tab was backgrounded
+        if (now - lastTick > speed * 2) lastTick = now;
+        tick();
+      }
+      interpRef.current = Math.min(1, (now - lastTick) / speed);
+      setFrame((f) => f + 1);
+    };
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
   }, [gameState, tick, score]);
 
   useEffect(() => {
@@ -233,12 +283,14 @@ export default function SnakeGame() {
     touchStart.current = null;
   };
 
-  const boardPx = GRID_SIZE * CELL_SIZE;
-
   const snakeColor = (i, len) => {
     const idx = Math.min(Math.floor((i / Math.max(len, 1)) * SNAKE_COLORS.length), SNAKE_COLORS.length - 1);
     return SNAKE_COLORS[idx];
   };
+
+  // Interpolate snake position, snapping on board wrap-around
+  const t = interpRef.current;
+  const prev = prevSnakeRef.current;
 
   return (
     <div
@@ -279,7 +331,7 @@ export default function SnakeGame() {
 
       <div
         style={{
-          width: boardPx,
+          width: BOARD_PX,
           maxWidth: "calc(100vw - 32px)",
           display: "flex",
           flexDirection: "column",
@@ -367,8 +419,8 @@ export default function SnakeGame() {
           position: "relative",
           width: "100%",
           aspectRatio: "1 / 1",
-          maxWidth: boardPx,
-          maxHeight: boardPx,
+          maxWidth: BOARD_PX,
+          maxHeight: BOARD_PX,
           background: "linear-gradient(135deg, #fff9fb, #fff0f5, #fef5ff, #f5f0ff)",
           border: "3px solid #ffd1dc",
           borderRadius: 16,
@@ -377,34 +429,17 @@ export default function SnakeGame() {
           overflow: "hidden",
         }}
       >
-        {Array.from({ length: GRID_SIZE }, (_, row) =>
-          Array.from({ length: GRID_SIZE }, (_, col) => (
-            <div
-              key={`${row}-${col}`}
-              style={{
-                position: "absolute",
-                left: col * CELL_SIZE,
-                top: row * CELL_SIZE,
-                width: CELL_SIZE,
-                height: CELL_SIZE,
-                background:
-                  (row + col) % 2 === 0
-                    ? "rgba(255,182,206,0.08)"
-                    : "rgba(212,180,247,0.06)",
-              }}
-            />
-          ))
-        )}
+        <Grid />
 
         {foods.map((f) => (
           <div
             key={f.id}
             style={{
               position: "absolute",
-              left: f.x * CELL_SIZE,
-              top: f.y * CELL_SIZE,
               width: CELL_SIZE,
               height: CELL_SIZE,
+              transform: `translate3d(${f.x * CELL_SIZE}px, ${f.y * CELL_SIZE}px, 0)`,
+              willChange: "transform",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -425,15 +460,28 @@ export default function SnakeGame() {
           const size = isHead ? CELL_SIZE - 1 : CELL_SIZE - 3;
           const offset = isHead ? 0.5 : 1.5;
           const color = snakeColor(i, snake.length);
+
+          // Interpolate between previous and current position
+          const p = prev[i];
+          let rx, ry;
+          if (p && Math.abs(seg.x - p.x) <= 1 && Math.abs(seg.y - p.y) <= 1) {
+            rx = p.x + (seg.x - p.x) * t;
+            ry = p.y + (seg.y - p.y) * t;
+          } else {
+            // No previous position or board wrap — snap
+            rx = seg.x;
+            ry = seg.y;
+          }
+
           return (
             <div
-              key={`${i}-${seg.x}-${seg.y}`}
+              key={i}
               style={{
                 position: "absolute",
-                left: seg.x * CELL_SIZE + offset,
-                top: seg.y * CELL_SIZE + offset,
                 width: size,
                 height: size,
+                transform: `translate3d(${rx * CELL_SIZE + offset}px, ${ry * CELL_SIZE + offset}px, 0)`,
+                willChange: "transform",
                 background: isHead
                   ? "linear-gradient(135deg, #ff6b9d, #ff85ab)"
                   : `linear-gradient(135deg, ${color}, ${color}dd)`,
@@ -442,7 +490,6 @@ export default function SnakeGame() {
                   ? "0 3px 10px rgba(255,107,157,0.5), inset 0 1px 2px rgba(255,255,255,0.4)"
                   : `0 2px 6px rgba(255,107,157,${Math.max(0.1, 0.3 - i * 0.02)})`,
                 border: isHead ? "2px solid rgba(255,255,255,0.5)" : "1px solid rgba(255,255,255,0.3)",
-                transition: "left 0.05s linear, top 0.05s linear",
                 zIndex: 100 - i,
               }}
             >
