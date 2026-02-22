@@ -108,6 +108,8 @@ export default function SnakeGame() {
   const [particles, setParticles] = useState([]);
   const [combo, setCombo] = useState(null);
   const [, setFrame] = useState(0);
+  const [boardScale, setBoardScale] = useState(1);
+  const boardWrapperRef = useRef(null);
 
   const dirRef = useRef(direction);
   const snakeRef = useRef(snake);
@@ -123,6 +125,18 @@ export default function SnakeGame() {
   foodsRef.current = foods;
   scoreRef.current = score;
   gameStateRef.current = gameState;
+
+  // Scale board content to fit responsive container
+  useEffect(() => {
+    const el = boardWrapperRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0].contentRect.width;
+      setBoardScale(Math.min(1, width / BOARD_PX));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const spawnParticles = useCallback((x, y) => {
     const emojis = ["✨", "⭐", "💖", "🌟", "💫", "🎀"];
@@ -413,6 +427,7 @@ export default function SnakeGame() {
       )}
 
       <div
+        ref={boardWrapperRef}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         style={{
@@ -420,12 +435,25 @@ export default function SnakeGame() {
           width: "100%",
           aspectRatio: "1 / 1",
           maxWidth: BOARD_PX,
-          maxHeight: BOARD_PX,
+          borderRadius: 16,
+          overflow: "hidden",
+          boxShadow:
+            "0 8px 32px rgba(255,107,157,0.15), 0 2px 8px rgba(196,77,255,0.1)",
+        }}
+      >
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: BOARD_PX,
+          height: BOARD_PX,
+          transform: `scale(${boardScale})`,
+          transformOrigin: "top left",
           background: "linear-gradient(135deg, #fff9fb, #fff0f5, #fef5ff, #f5f0ff)",
           border: "3px solid #ffd1dc",
-          borderRadius: 16,
-          boxShadow:
-            "0 8px 32px rgba(255,107,157,0.15), 0 2px 8px rgba(196,77,255,0.1), inset 0 0 40px rgba(255,255,255,0.5)",
+          borderRadius: 16 / boardScale,
+          boxShadow: "inset 0 0 40px rgba(255,255,255,0.5)",
           overflow: "hidden",
         }}
       >
@@ -684,6 +712,7 @@ export default function SnakeGame() {
             </button>
           </Overlay>
         )}
+      </div>
       </div>
 
       <div
