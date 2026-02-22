@@ -436,10 +436,10 @@ export default function SnakeGame() {
             key={f.id}
             style={{
               position: "absolute",
+              left: f.x * CELL_SIZE,
+              top: f.y * CELL_SIZE,
               width: CELL_SIZE,
               height: CELL_SIZE,
-              transform: `translate3d(${f.x * CELL_SIZE}px, ${f.y * CELL_SIZE}px, 0)`,
-              willChange: "transform",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
