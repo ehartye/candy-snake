@@ -249,6 +249,7 @@ export default function SnakeGame() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
+        padding: "16px",
         fontFamily: "'Nunito', 'Quicksand', 'Comic Sans MS', sans-serif",
         color: "#6b4c6e",
         userSelect: "none",
@@ -278,10 +279,19 @@ export default function SnakeGame() {
 
       <div
         style={{
+          width: boardPx,
+          maxWidth: "calc(100vw - 32px)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+      <div
+        style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          width: boardPx,
+          width: "100%",
           marginBottom: 14,
           padding: "0 4px",
         }}
@@ -355,8 +365,10 @@ export default function SnakeGame() {
         onTouchEnd={handleTouchEnd}
         style={{
           position: "relative",
-          width: boardPx,
-          height: boardPx,
+          width: "100%",
+          aspectRatio: "1 / 1",
+          maxWidth: boardPx,
+          maxHeight: boardPx,
           background: "linear-gradient(135deg, #fff9fb, #fff0f5, #fef5ff, #f5f0ff)",
           border: "3px solid #ffd1dc",
           borderRadius: 16,
@@ -674,6 +686,7 @@ export default function SnakeGame() {
 
       <div style={{ marginTop: 12, fontSize: 11, color: "#d4b8d8", letterSpacing: 1 }}>
         SPACE TO PAUSE
+      </div>
       </div>
 
       <style>{`
