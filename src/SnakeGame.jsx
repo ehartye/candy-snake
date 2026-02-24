@@ -39,6 +39,26 @@ const POINTS = {
 };
 
 const BOARD_PX = GRID_SIZE * CELL_SIZE;
+const LEADERBOARD_KEY = "candy-snake-leaderboard";
+const MAX_SCORES = 10;
+
+function loadLeaderboard() {
+  try {
+    const data = JSON.parse(localStorage.getItem(LEADERBOARD_KEY));
+    if (Array.isArray(data)) return data.slice(0, MAX_SCORES);
+  } catch {}
+  return [];
+}
+
+function saveLeaderboard(board) {
+  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(board.slice(0, MAX_SCORES)));
+}
+
+function qualifiesForLeaderboard(score, board) {
+  if (score <= 0) return false;
+  if (board.length < MAX_SCORES) return true;
+  return score > board[board.length - 1].score;
+}
 
 // Static checkerboard grid - never re-renders
 const Grid = memo(function Grid() {
@@ -99,17 +119,25 @@ function spawnFoods(count, snake, existing) {
 }
 
 export default function SnakeGame() {
+  const [leaderboard, setLeaderboard] = useState(() => loadLeaderboard());
   const [gameState, setGameState] = useState("idle");
   const [snake, setSnake] = useState([{ x: 10, y: 10 }]);
   const [foods, setFoods] = useState([]);
   const [direction, setDirection] = useState({ x: 1, y: 0 });
   const [score, setScore] = useState(0);
-  const [highScore, setHighScore] = useState(0);
+  const [highScore, setHighScore] = useState(() => {
+    const board = loadLeaderboard();
+    return board.length > 0 ? board[0].score : 0;
+  });
   const [particles, setParticles] = useState([]);
   const [combo, setCombo] = useState(null);
   const [, setFrame] = useState(0);
   const [boardScale, setBoardScale] = useState(1);
+  const [enteringInitials, setEnteringInitials] = useState(false);
+  const [initials, setInitials] = useState(["A", "A", "A"]);
+  const [initialPos, setInitialPos] = useState(0);
   const boardWrapperRef = useRef(null);
+  const enteringInitialsRef = useRef(false);
 
   const dirRef = useRef(direction);
   const snakeRef = useRef(snake);
@@ -125,6 +153,7 @@ export default function SnakeGame() {
   foodsRef.current = foods;
   scoreRef.current = score;
   gameStateRef.current = gameState;
+  enteringInitialsRef.current = enteringInitials;
 
   // Scale board content to fit responsive container
   useEffect(() => {
@@ -157,6 +186,7 @@ export default function SnakeGame() {
   }, []);
 
   const startGame = useCallback(() => {
+    setEnteringInitials(false);
     const initial = [{ x: 10, y: 10 }];
     setSnake(initial);
     prevSnakeRef.current = initial;
@@ -168,6 +198,18 @@ export default function SnakeGame() {
     setScore(0);
     setGameState("playing");
   }, []);
+
+  const submitScore = useCallback((initialsArr) => {
+    const entry = { name: initialsArr.join(""), score, date: Date.now() };
+    const board = loadLeaderboard();
+    board.push(entry);
+    board.sort((a, b) => b.score - a.score);
+    const trimmed = board.slice(0, MAX_SCORES);
+    saveLeaderboard(trimmed);
+    setLeaderboard(trimmed);
+    setHighScore((h) => Math.max(h, score));
+    setEnteringInitials(false);
+  }, [score]);
 
   const tick = useCallback(() => {
     if (gameStateRef.current !== "playing") return;
@@ -190,7 +232,13 @@ export default function SnakeGame() {
 
     if (currentSnake.some((s) => s.x === newHead.x && s.y === newHead.y)) {
       setGameState("over");
-      setHighScore((h) => Math.max(h, scoreRef.current));
+      const finalScore = scoreRef.current;
+      setHighScore((h) => Math.max(h, finalScore));
+      if (qualifiesForLeaderboard(finalScore, loadLeaderboard())) {
+        setInitials(["A", "A", "A"]);
+        setInitialPos(0);
+        setEnteringInitials(true);
+      }
       return;
     }
 
@@ -251,6 +299,9 @@ export default function SnakeGame() {
 
   useEffect(() => {
     const handleKey = (e) => {
+      // Block game controls while entering initials
+      if (enteringInitialsRef.current) return;
+
       if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
         if (gameState === "idle" || gameState === "over") startGame();
@@ -633,35 +684,62 @@ export default function SnakeGame() {
 
         {gameState === "idle" && (
           <Overlay>
-            <div style={{ fontSize: 48, marginBottom: 4 }}>🍭</div>
-            <div
-              style={{
-                fontSize: 36,
-                fontFamily: "'Fredoka One', cursive",
-                fontWeight: 900,
-                background: "linear-gradient(135deg, #ff6b9d, #c44dff)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              Candy Snake
-            </div>
-            <div style={{ fontSize: 13, color: "#c4a0c8", marginTop: 4, letterSpacing: 1 }}>
-              Collect all the sweets!
-            </div>
-            <div style={{ display: "flex", gap: 6, marginTop: 10, fontSize: 11, color: "#b888c0", flexWrap: "wrap", justifyContent: "center" }}>
-              <span>🍬🍭🍪 10pts</span>
-              <span>🍩🍫🍡 15pts</span>
-              <span>🧁🍰 20pts</span>
-              <span>🍮 25pts</span>
-              <span>🎂 30pts</span>
-            </div>
-            <button onClick={startGame} style={btnStyle}>
-              🍬 PLAY
-            </button>
-            <div style={{ fontSize: 11, color: "#d4b8d8", marginTop: 10 }}>
-              Arrow keys · WASD · Swipe
-            </div>
+            {leaderboard.length > 0 ? (
+              <>
+                <div
+                  style={{
+                    fontSize: 28,
+                    fontFamily: "'Fredoka One', cursive",
+                    fontWeight: 900,
+                    background: "linear-gradient(135deg, #ff6b9d, #c44dff)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    marginBottom: 6,
+                  }}
+                >
+                  🍭 Candy Snake
+                </div>
+                <LeaderboardTable entries={leaderboard} highlight={-1} />
+                <button onClick={startGame} style={btnStyle}>
+                  🍬 PLAY
+                </button>
+                <div style={{ fontSize: 11, color: "#d4b8d8", marginTop: 8 }}>
+                  Arrow keys · WASD · Swipe
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 48, marginBottom: 4 }}>🍭</div>
+                <div
+                  style={{
+                    fontSize: 36,
+                    fontFamily: "'Fredoka One', cursive",
+                    fontWeight: 900,
+                    background: "linear-gradient(135deg, #ff6b9d, #c44dff)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                  }}
+                >
+                  Candy Snake
+                </div>
+                <div style={{ fontSize: 13, color: "#c4a0c8", marginTop: 4, letterSpacing: 1 }}>
+                  Collect all the sweets!
+                </div>
+                <div style={{ display: "flex", gap: 6, marginTop: 10, fontSize: 11, color: "#b888c0", flexWrap: "wrap", justifyContent: "center" }}>
+                  <span>🍬🍭🍪 10pts</span>
+                  <span>🍩🍫🍡 15pts</span>
+                  <span>🧁🍰 20pts</span>
+                  <span>🍮 25pts</span>
+                  <span>🎂 30pts</span>
+                </div>
+                <button onClick={startGame} style={btnStyle}>
+                  🍬 PLAY
+                </button>
+                <div style={{ fontSize: 11, color: "#d4b8d8", marginTop: 10 }}>
+                  Arrow keys · WASD · Swipe
+                </div>
+              </>
+            )}
           </Overlay>
         )}
 
@@ -687,14 +765,14 @@ export default function SnakeGame() {
 
         {gameState === "over" && (
           <Overlay>
-            <div style={{ fontSize: 36 }}>😵</div>
+            <div style={{ fontSize: 30 }}>😵</div>
             <div
               style={{
-                fontSize: 26,
+                fontSize: 22,
                 fontFamily: "'Fredoka One', cursive",
                 fontWeight: 900,
                 color: "#ff6b9d",
-                marginTop: 4,
+                marginTop: 2,
               }}
             >
               Sugar Crash!
@@ -702,14 +780,29 @@ export default function SnakeGame() {
             <div style={{ fontSize: 15, color: "#b888c0", marginTop: 4 }}>
               Score: <span style={{ color: "#ff6b9d", fontWeight: 700 }}>{score}</span> 🍬
             </div>
-            {score >= highScore && score > 0 && (
-              <div style={{ fontSize: 13, color: "#c44dff", marginTop: 2 }}>
-                ✨ New High Score! ✨
-              </div>
+            {enteringInitials ? (
+              <InitialsEntry
+                initials={initials}
+                setInitials={setInitials}
+                pos={initialPos}
+                setPos={setInitialPos}
+                onSubmit={() => submitScore(initials)}
+              />
+            ) : (
+              <>
+                {leaderboard.length > 0 && (
+                  <LeaderboardTable
+                    entries={leaderboard}
+                    highlight={leaderboard.findIndex(
+                      (e) => e.score === score && e.name === initials.join("")
+                    )}
+                  />
+                )}
+                <button onClick={startGame} style={btnStyle}>
+                  🔄 TRY AGAIN
+                </button>
+              </>
             )}
-            <button onClick={startGame} style={btnStyle}>
-              🔄 TRY AGAIN
-            </button>
           </Overlay>
         )}
       </div>
@@ -793,6 +886,179 @@ export default function SnakeGame() {
   );
 }
 
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+function InitialsEntry({ initials, setInitials, pos, setPos, onSubmit }) {
+  useEffect(() => {
+    const handleKey = (e) => {
+      e.preventDefault();
+      if (e.key === "Enter" || e.key === " ") {
+        if (pos < 2) {
+          setPos(pos + 1);
+        } else {
+          onSubmit();
+        }
+        return;
+      }
+      if (e.key === "ArrowUp" || e.key === "w") {
+        setInitials((prev) => {
+          const next = [...prev];
+          const idx = ALPHABET.indexOf(next[pos]);
+          next[pos] = ALPHABET[(idx + 1) % 26];
+          return next;
+        });
+      } else if (e.key === "ArrowDown" || e.key === "s") {
+        setInitials((prev) => {
+          const next = [...prev];
+          const idx = ALPHABET.indexOf(next[pos]);
+          next[pos] = ALPHABET[(idx + 25) % 26];
+          return next;
+        });
+      } else if (e.key === "ArrowRight" || e.key === "d") {
+        if (pos < 2) setPos(pos + 1);
+      } else if (e.key === "ArrowLeft" || e.key === "a") {
+        if (pos > 0) setPos(pos - 1);
+      } else if (e.key === "Backspace") {
+        if (pos > 0) setPos(pos - 1);
+      } else if (/^[a-zA-Z]$/.test(e.key)) {
+        setInitials((prev) => {
+          const next = [...prev];
+          next[pos] = e.key.toUpperCase();
+          return next;
+        });
+        if (pos < 2) setPos(pos + 1);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [pos, setPos, setInitials, onSubmit]);
+
+  const cycleLetter = (slot, delta) => {
+    setInitials((prev) => {
+      const next = [...prev];
+      const idx = ALPHABET.indexOf(next[slot]);
+      next[slot] = ALPHABET[(idx + delta + 26) % 26];
+      return next;
+    });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 8 }}>
+      <div style={{ fontSize: 12, color: "#c44dff", fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>
+        ENTER YOUR INITIALS
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {initials.map((letter, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <button
+              onClick={() => { setPos(i); cycleLetter(i, 1); }}
+              style={arrowBtnStyle}
+            >
+              ▲
+            </button>
+            <div
+              onClick={() => setPos(i)}
+              style={{
+                width: 36,
+                height: 42,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 26,
+                fontFamily: "'Fredoka One', monospace",
+                fontWeight: 900,
+                color: i === pos ? "#ff6b9d" : "#b888c0",
+                background: i === pos ? "rgba(255,107,157,0.1)" : "rgba(255,255,255,0.5)",
+                border: i === pos ? "2px solid #ff6b9d" : "2px solid #e8d8f0",
+                borderRadius: 8,
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+            >
+              {letter}
+            </div>
+            <button
+              onClick={() => { setPos(i); cycleLetter(i, -1); }}
+              style={arrowBtnStyle}
+            >
+              ▼
+            </button>
+          </div>
+        ))}
+      </div>
+      <button onClick={onSubmit} style={{ ...btnStyle, marginTop: 10, padding: "8px 24px", fontSize: 13 }}>
+        OK
+      </button>
+      <div style={{ fontSize: 10, color: "#d4b8d8", marginTop: 6 }}>
+        Type · Arrows · Enter
+      </div>
+    </div>
+  );
+}
+
+function LeaderboardTable({ entries, highlight }) {
+  return (
+    <div style={{
+      width: "100%",
+      maxWidth: 240,
+      margin: "8px 0",
+    }}>
+      <div style={{
+        fontSize: 11,
+        fontWeight: 700,
+        color: "#c44dff",
+        letterSpacing: 2,
+        textAlign: "center",
+        marginBottom: 4,
+      }}>
+        HIGH SCORES
+      </div>
+      <div style={{
+        background: "rgba(255,255,255,0.5)",
+        borderRadius: 10,
+        border: "2px solid #f0e0f8",
+        padding: "6px 10px",
+        maxHeight: 180,
+        overflowY: "auto",
+      }}>
+        {entries.map((entry, i) => (
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "3px 4px",
+              borderRadius: 6,
+              background: i === highlight ? "rgba(255,107,157,0.12)" : "transparent",
+              fontSize: 13,
+              fontFamily: "'Fredoka One', monospace",
+            }}
+          >
+            <span style={{ color: i < 3 ? "#c44dff" : "#b888c0", width: 22, textAlign: "right" }}>
+              {i === 0 ? "👑" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`}
+            </span>
+            <span style={{
+              color: i === highlight ? "#ff6b9d" : "#8a6b8e",
+              letterSpacing: 3,
+              flex: 1,
+              textAlign: "center",
+            }}>
+              {entry.name}
+            </span>
+            <span style={{
+              color: i === highlight ? "#ff6b9d" : "#9b59b6",
+              fontWeight: 700,
+            }}>
+              {String(entry.score).padStart(4, "0")}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Overlay({ children }) {
   return (
     <div
@@ -854,4 +1120,19 @@ const btnStyle = {
   cursor: "pointer",
   boxShadow: "0 4px 15px rgba(255,107,157,0.4)",
   transition: "all 0.2s",
+};
+
+const arrowBtnStyle = {
+  width: 28,
+  height: 20,
+  background: "none",
+  border: "none",
+  color: "#c44dff",
+  fontSize: 10,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
+  opacity: 0.6,
 };
