@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /c/Users/ehart/repos/candy-snake && npm create vite@latest . -- --template react 2>&1)",
+      "Bash(cd /c/Users/ehart/repos/candy-snake && npm install 2>&1)",
+      "Bash(cd /c/Users/ehart/repos/candy-snake && npm run build 2>&1)",
+      "Bash(cd:*)",
+      "Bash(cd /c/Users/ehart/repos/candy-snake && git config user.name && git config user.email 2>&1)",
+      "Bash(gh api:*)",
+      "Bash(git config:*)",
+      "Bash(cd /c/Users/ehart/repos/candy-snake && git push -u origin main 2>&1)",
+      "Bash(cd /c/Users/ehart/repos/candy-snake && git add src/SnakeGame.jsx index.html && git commit -m \"$\\(cat <<'EOF'\nFix mobile scrolling when swiping to control snake\n\nPrevent default on touch events and disable overscroll/bounce\non the page so swipes only control the snake direction.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push 2>&1)",
+      "Bash(cd /c/Users/ehart/repos/candy-snake && git add src/SnakeGame.jsx && git commit -m \"$\\(cat <<'EOF'\nFix play button not working on mobile\n\nOnly preventDefault on touch events during gameplay, not on\nmenu screens where buttons need to receive taps.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push 2>&1)",
+      "Bash(cd /c/Users/ehart/repos/candy-snake && git add src/SnakeGame.jsx index.html && git commit -m \"$\\(cat <<'EOF'\nAdd padding and responsive scaling for mobile screens\n\nWrap game UI in a max-width container with 16px gutters so\nnothing touches screen edges. Board uses aspect-ratio to\nscale down on narrow viewports.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push 2>&1)",
+      "Bash(cd /c/Users/ehart/repos/candy-snake && git add src/SnakeGame.jsx && git commit -m \"$\\(cat <<'EOF'\nSmooth 60fps rendering with rAF interpolation and GPU compositing\n\n- Replace setInterval with requestAnimationFrame game loop that\n  ticks at game speed but renders at 60fps with position interpolation\n- Switch snake/food from left/top to transform: translate3d\\(\\) for\n  GPU-accelerated compositing \\(skips layout recalculation\\)\n- Extract static checkerboard grid to React.memo component,\n  eliminating 400 unnecessary DOM diffs per frame\n- Add will-change: transform hints for compositor layer promotion\n- Handle board wrap-around by snapping instead of interpolating\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push 2>&1)",
+      "Bash(cd /c/Users/ehart/repos/candy-snake && git add src/SnakeGame.jsx && git commit -m \"$\\(cat <<'EOF'\nFix snake going off-screen on mobile via scaled board\n\nThe board CSS was responsive \\(shrinks on small screens\\) but all\ngame elements were positioned in full 440px coordinates, causing\ncontent near edges to render outside the visible area.\n\nFix: keep the board internally at its fixed pixel size and use\nCSS transform: scale\\(\\) to fit it into the responsive container.\nA ResizeObserver tracks the wrapper size and computes the scale.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push 2>&1)"
+    ]
+  }
+}
